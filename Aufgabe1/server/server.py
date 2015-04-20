@@ -3,6 +3,7 @@ import sys
 import argparse
 import threading
 import time
+import select
 
 
 def parse(response):
@@ -73,11 +74,12 @@ class RequestHandler(threading.Thread):
 		code, message = parse(command)
 		if not self.handlers.__contains__(code):
 			self.send_to_client("ERROR INVALID COMMAND")
+			return True
 		else:
 			return self.handlers[code](message)
 
 	def remove(self):
-		print("Client disconnected: ", self.client.getpeername())
+		# print("Client disconnected: ", self.client.getpeername())
 		self.server.on_disconnect(self)
 
 	def receive(self):
@@ -103,7 +105,7 @@ class Server(object):
 	def start(self):
 		self.connection = socket.socket()
 		try:
-			self.connection.bind((socket.gethostname(), self.port))
+			self.connection.bind(('127.0.0.1', self.port))
 			self.connection.listen(1)
 		except socket.error as error:
 			print error
@@ -115,7 +117,7 @@ class Server(object):
 	def on_disconnect(self, client):
 		self.clients.remove(client)
 		if self.shutdown_granted and len(self.clients) == 0:
-			self.connection.close()
+			self.close()
 
 	def on_client_accept(self, connection):
 		handler = RequestHandler(connection, self)
@@ -125,6 +127,7 @@ class Server(object):
 	def request_shutdown(self, password):
 		if password == self.shutdown_password:
 			self.shutdown_granted = True
+			print "Shutdown was granted."
 			return True
 		else:
 			return False
@@ -132,12 +135,26 @@ class Server(object):
 	def wait_clients(self):
 		while not self.shutdown_granted:
 			if len(self.clients) < self.max_clients:
-				client_connection, address = self.connection.accept()
-				print("Accepted client from ", address)
-				self.on_client_accept(client_connection)
+				print "Waiting"
+				readable_list = [self.connection]
+				readable, writeable, errord = select.select(readable_list, [], [])
+				for s in readable:
+					if s is self.connection:
+						try:
+							client_connection, address = self.connection.accept()
+						except socket.error as accept_error:
+							print("Error while accepting client: ", accept_error)
+						print("Accepted client from ", address)
+						self.on_client_accept(client_connection)
 			else:
 				time.sleep(0.1)
-
+	
+	def close(self):
+		try:
+			self.connection.shutdown(socket.SHUT_RDWR)
+			self.connection.close()
+		except:
+			pass
 
 def configure():
 	parser = argparse.ArgumentParser(description="RN Server")
@@ -147,10 +164,7 @@ def configure():
 	result = parser.parse_args(sys.argv[1:])
 	server =  Server(max_clients=result.max_clients,port=result.port, password=result.password)
 	result = server.start()
-	if result:
-		return None, result
-	else:
-		return server, None
+	return server, result
 
 if __name__ == "__main__":
 	server, error = configure()
@@ -159,3 +173,4 @@ if __name__ == "__main__":
 	else:
 		print "Awaiting connection"
 		server.wait_clients()
+		server.close()

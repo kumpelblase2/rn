@@ -24,8 +24,6 @@ class Client(object):
 		except socket.error as connectionerror:
 			return connectionerror
 
-		return None
-
 	def close(self):
 		self.connection.close()
 
@@ -87,7 +85,7 @@ def command_prompt(client):
 				print("Server is shutting down")
 				break
 			else:
-				print("Server responded with: ", message)
+				print("Server responded with: ", code, message)
 
 
 if __name__ == "__main__":
