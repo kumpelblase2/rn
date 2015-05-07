@@ -170,9 +170,9 @@ def save_message(user, lines):
 
 def connect_to_server(config):
 	client = Client()
-	client.user = config['username']
-	client.password = config['password']
-	error = client.connect(config['host'], config['port'])
+	client.user = config.get('username','')
+	client.password = config.get('password','')
+	error = client.connect(config.get('host','127.0.0.1'), config.get('port',110))
 	return client, error
 
 def load_config():
@@ -193,7 +193,7 @@ def load_config():
 	return servers
 
 def pull_for_server(config):
-	print("Starting mail collection for ", config.host)
+	print("Starting mail collection for ", config.get(host,'127.0.0.1'), config.get(port,'110'))
 	client, error = connect_to_server(config)
 	if error:
 		print("Error connecting to server",  error)
