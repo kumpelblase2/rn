@@ -185,16 +185,10 @@ def save_message(directory, lines):
 
 def connect_to_server(config):
 	client = Client()
-<<<<<<< HEAD
 	client.user = config.get('username','')
 	client.password = config.get('password','')
 	error = client.connect(config.get('host','127.0.0.1'), config.get('port',110))
-=======
-	client.user = config['username']
-	client.password = config['password']
-	client.maildir = config['maildir']
-	error = client.connect(config['host'], config['port'])
->>>>>>> 6ade74f0d0ca90b3333415b4a30be9dee3e92ec0
+	client.maildir = config.get('maildir',client.user)
 	return client, error
 
 def load_config():
