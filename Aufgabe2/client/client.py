@@ -21,6 +21,7 @@ class Client(object):
 		self.password = None
 		self.connection = socket.socket()
 		self.state = None
+		self.maildir = None
 
 	def connect(self, host, port):
 		try:
@@ -68,6 +69,8 @@ class Client(object):
 		self.state = GreetingState(self)
 		while self.state is not None:
 			self.state = self.state.run()
+
+		QuitState(self).run()
 
 	def quit(self):
 		self.send_command("QUIT")
@@ -143,7 +146,11 @@ class TransactionState():
 				return None
 
 			lines = self.client.wait_multi_line()
-			save_message(self.client.user, lines)
+			err = save_message(self.client.maildir, lines)
+			if err:
+				print("Error when saving mail", err)
+				continue
+
 			err = self.client.send_command("DELE", i)
 			if err:
 				print("Error when sending delete: ", err)
@@ -154,7 +161,7 @@ class TransactionState():
 				print("Got error when receiving delete", ' '.join([message, info]))
 				return None
 
-		return QuitState(self.client)
+		return None
 
 class QuitState():
 	def __init__(self, client):
@@ -164,15 +171,30 @@ class QuitState():
 		self.client.quit()
 		return None
 
-def save_message(user, lines):
-	pass
+def save_message(directory, lines):
+	previous_message_amount = len([name for name in os.listdir(directory) if os.path.isfile(os.path.join(directory, name))])
+	own_number = previous_message_amount + 1
+	file_name = os.path.join(directory, basestring(own_number) + ".msg")
+	try:
+		file_handle = open(file_name, 'w')
+		file_handle.write('\n'.join(lines))
+		file_Handle.close()
+	except Exception as error:
+		return IOError("Cannot write mail %s" % error)
 
 
 def connect_to_server(config):
 	client = Client()
+<<<<<<< HEAD
 	client.user = config.get('username','')
 	client.password = config.get('password','')
 	error = client.connect(config.get('host','127.0.0.1'), config.get('port',110))
+=======
+	client.user = config['username']
+	client.password = config['password']
+	client.maildir = config['maildir']
+	error = client.connect(config['host'], config['port'])
+>>>>>>> 6ade74f0d0ca90b3333415b4a30be9dee3e92ec0
 	return client, error
 
 def load_config():
