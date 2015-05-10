@@ -96,7 +96,7 @@ class Server(object):
 
 def load_config():
 	config = ConfigParser.ConfigParser()
-	config.read("../client.ini")
+	config.read("../config.ini")
 	servers = {}
 	for section in config.sections():
 		values = {}
