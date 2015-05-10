@@ -10,7 +10,8 @@ class Mail():
 	def load(self):
 		file = open(self.filename, 'r')
 		self.content = file.read().split('\r\n')
-		self.uid = file.name[:file.name.index('.')]
+		self.uid = os.path.basename(file.name)
+		self.uid = self.uid[:self.uid.index('.')]
 		file.close()
 
 	def size(self):
