@@ -25,15 +25,6 @@ class RequestHandler(threading.Thread):
 		self.account = None
 		self.mails = []
 
-	def shutdown(self, message):
-		if self.server.request_shutdown(message):
-			self.send_to_client("OK SHUTDOWN")
-			self.remove()
-			return False
-		else:
-			self.send_to_client("ERROR INVALID PASSWORD")
-			return True
-
 	def run(self):
 		while self.state:
 			self.state = self.state.run()
@@ -73,6 +64,7 @@ class RequestHandler(threading.Thread):
 
 	def remove(self):
 		self.server.on_disconnect(self)
+		self.unlock()
 
 	def receive(self):
 		try:
@@ -103,5 +95,4 @@ class RequestHandler(threading.Thread):
 
 	def unlock(self):
 		self.server.set_logged_in(self.account['username'], False)
-		print("unlocked")
 		del self.mails[:]
