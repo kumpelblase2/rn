@@ -1,8 +1,9 @@
 import socket
-import sys
 import ConfigParser
 import sched, time
 import traceback
+import os
+import uuid
 
 OK = '+OK'
 ERROR = '-ERR'
@@ -172,13 +173,11 @@ class QuitState():
         return None
 
 def save_message(directory, lines):
-    previous_message_amount = len([name for name in os.listdir(directory) if os.path.isfile(os.path.join(directory, name))])
-    own_number = previous_message_amount + 1
-    file_name = os.path.join(directory, basestring(own_number) + ".msg")
+    file_name = os.path.join(directory, str(uuid.uuid1()) + ".msg")
     try:
         file_handle = open(file_name, 'w')
-        file_handle.write('\n'.join(lines))
-        file_Handle.close()
+        file_handle.write('\r\n'.join(lines) + ".\r\n")
+        file_handle.close()
     except Exception as error:
         return IOError("Cannot write mail %s" % error)
 
@@ -193,7 +192,7 @@ def connect_to_server(config):
 
 def load_config():
     config = ConfigParser.ConfigParser()
-    config.read("./client.ini")
+    config.read("../client.ini")
     servers = {}
     for section in config.sections():
         values = {}
@@ -209,7 +208,7 @@ def load_config():
     return servers
 
 def pull_for_server(config):
-    print("Starting mail collection for ", config.get(host,'127.0.0.1'), config.get(port,'110'))
+    print("Starting mail collection for ", config.get('host','127.0.0.1'), config.get('port','110'))
     client, error = connect_to_server(config)
     if error:
         print("Error connecting to server",  error)
