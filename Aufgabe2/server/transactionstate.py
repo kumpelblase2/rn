@@ -37,7 +37,7 @@ class TransactionState():
 			index = -1
 			not_deleted = self.handler.not_deleted_mails()
 			try:
-				index = int(content[0])
+				index = int(content[0]) - 1
 			except:
 				self.handler.send_error("Invalid index")
 
@@ -63,7 +63,7 @@ class TransactionState():
 		index = -1
 		not_deleted = self.handler.not_deleted_mails()
 		try:
-			index = int(content[0])
+			index = int(content[0]) - 1
 		except:
 			self.handler.send_error("Invalid index")
 
@@ -83,7 +83,7 @@ class TransactionState():
 		index = -1
 		not_deleted = self.handler.not_deleted_mails()
 		try:
-			index = int(content[0])
+			index = int(content[0]) - 1
 		except:
 			self.handler.send_error("Invalid index")
 
@@ -115,7 +115,7 @@ class TransactionState():
 			index = -1
 			not_deleted = self.handler.not_deleted_mails()
 			try:
-				index = int(content[0])
+				index = int(content[0]) - 1
 			except:
 				self.handler.send_error("Invalid index")
 
