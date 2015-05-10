@@ -35,7 +35,7 @@ class Client(object):
 
     def send(self, content):
         try:
-            sent = self.connection.send(content + "\n")
+            sent = self.connection.send(content + "\r\n")
             if sent < 0:
                 return IOError("Was not able to send content")
             else:
@@ -56,10 +56,15 @@ class Client(object):
 
     def wait_multi_line(self):
         data = []
-        received = self.wait_receive()
-        while received != '.':
-            received.append(received)
-            received = self.wait_receive()
+        while True:
+            received = self.wait_receive().split('\r\n')
+            while len(received) > 0:
+                current = received[0]
+                if current == '.':
+                    return data
+                else:
+                    data.append(current)
+                    received.pop(0)
 
         return data
 
@@ -135,16 +140,17 @@ class TransactionState():
             print("Got error when receiving status", ' '.join([messages, octets]))
             return None
 
-        for i in range(1, int(messages)):
-            err = self.client.send_command("RETR", i)
+        for i in range(1, int(messages) + 1):
+            print("Retrieving " + str(i))
+            err = self.client.send_command("RETR", str(i))
             if err:
                 print("Error when sending retrieve: ", err)
-                return None
+                continue
 
             response, octets, info = self.client.wait_command_result()
             if response != OK:
                 print("Got error when receiving message", ' '.join([octets, info]))
-                return None
+                continue
 
             lines = self.client.wait_multi_line()
             err = save_message(self.client.maildir, lines)
@@ -152,7 +158,7 @@ class TransactionState():
                 print("Error when saving mail", err)
                 continue
 
-            err = self.client.send_command("DELE", i)
+            err = self.client.send_command("DELE", str(i))
             if err:
                 print("Error when sending delete: ", err)
                 return None
@@ -176,7 +182,7 @@ def save_message(directory, lines):
     file_name = os.path.join(directory, str(uuid.uuid1()) + ".msg")
     try:
         file_handle = open(file_name, 'w')
-        file_handle.write('\r\n'.join(lines) + ".\r\n")
+        file_handle.write('\r\n'.join(lines))
         file_handle.close()
     except Exception as error:
         return IOError("Cannot write mail %s" % error)
