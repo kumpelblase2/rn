@@ -87,9 +87,9 @@ class RequestHandler(threading.Thread):
 	def load_and_lock(self):
 		self.server.set_logged_in(self.account['username'], True)
 		mailboxdir = abspath(join(os.path.dirname(os.path.realpath(__file__)), self.account['maildir']))
-		files = [ f for f in listdir(mailboxdir) if isfile(join(mailboxdir,f)) ]
+		files = [f for f in listdir(mailboxdir) if isfile(join(mailboxdir, f))]
 		for file in files:
-			mail = mailC.Mail(file)
+			mail = mailC.Mail(join(mailboxdir, file))
 			self.mails.append(mail)
 			mail.load()
 
