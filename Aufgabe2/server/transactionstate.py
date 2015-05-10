@@ -61,19 +61,23 @@ class TransactionState():
 			return
 
 		index = -1
-		not_deleted = self.handler.not_deleted_mails()
 		try:
 			index = int(content[0]) - 1
 		except:
 			self.handler.send_error("Invalid index")
 
-		if len(not_deleted) <= index or index == -1:
+		if len(self.handler.mails) <= index or index == -1:
 			self.handler.send_error("Invalid message index")
 		else:
-			self.handler.send_response(status.OK, "Message", "will follow")
-			mail = not_deleted[index]
-			for line in mail.content:
-				self.handler.send_to_client(line + "\r\n")
+			if self.handler.mails[index].deleted:
+				self.handler.send_error("Message is marked as deleted")
+			else:
+				self.handler.send_response(status.OK, "Message", "will follow")
+				mail = self.handler.mails[index]
+				for line in mail.content:
+					self.handler.send_to_client(line + "\r\n")
+
+				self.handler.send_to_client(".\r\n")
 
 	def handle_dele(self, content):
 		if len(content) == 0:
@@ -81,17 +85,19 @@ class TransactionState():
 			return
 
 		index = -1
-		not_deleted = self.handler.not_deleted_mails()
 		try:
 			index = int(content[0]) - 1
 		except:
 			self.handler.send_error("Invalid index")
 
-		if len(not_deleted) <= index or index == -1:
+		if len(self.handler.mails) <= index or index == -1:
 			self.handler.send_error("Invalid message index")
 		else:
-			not_deleted[index].deleted = True
-			self.handler.send_response(status.OK, "Message", "deleted")
+			if self.handler.mails[index].deleted:
+				self.handler.send_error("Message is marked as deleted")
+			else:
+				self.handler.mails[index].deleted = True
+				self.handler.send_response(status.OK, "Message", "deleted")
 
 	def handle_noop(self, content):
 		self.handler.send_status(status.OK)
