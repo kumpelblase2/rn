@@ -32,7 +32,7 @@ class AuthorizationState():
 			elif len(content) < 1:
 				self.handler.send_error("Need password")
 			else:
-				if self.handler.server.try_login(account['username'], content[0]):
+				if self.handler.server.try_login(account['name'], content[0]):
 					self.handler.account = account
 					self.handler.send_response(status.OK, "Accepted", "Successfully authorized")
 					break

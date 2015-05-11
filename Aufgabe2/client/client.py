@@ -9,6 +9,7 @@ OK = '+OK'
 ERROR = '-ERR'
 
 def parse(response):
+    #print response
     if not response.__contains__(' '):
         return response, '', ''
 
@@ -23,6 +24,7 @@ class Client(object):
         self.connection = socket.socket()
         self.state = None
         self.maildir = None
+        self.restbuf=""
 
     def connect(self, host, port):
         try:
@@ -44,11 +46,18 @@ class Client(object):
             return timeout
 
     def wait_receive(self):
-        data = self.connection.recv(512)  # Max 512 character including CRLF
-        if data[-2:] == '\r\n':  # Should always end with CRLF
-            return data[:-2]
-        else:
-            return self.wait_receive()
+        buffer = self.restbuf
+        while len(buffer) < 512 and '\r\n' not in buffer:
+            buffer += self.connection.recv(512)
+        #print "RESP>",buffer.encode('hex')
+        pos = buffer.find('\r\n')
+        self.restbuf=buffer[pos+2:]
+        return buffer[:pos ]
+        #data = self.connection.recv(512)  # Max 512 character including CRLF
+        #if data[-2:] == '\r\n':  # Should always end with CRLF
+        #    return data[:-2]
+        #else:
+        #    return ""
 
     def wait_command_result(self):
         data = self.wait_receive()
@@ -90,7 +99,7 @@ class GreetingState(object):
 
     def run(self):
         greeting, keyword, info = self.client.wait_command_result()
-        if greeting != OK:
+        if OK not in greeting:
             raise RuntimeError("Greeting was not ok")
 
         print("Successful greeting: ", keyword, info)
@@ -101,23 +110,27 @@ class AuthenticationState():
         self.client = client
 
     def run(self):
+        #print "SEND>","LOGIN",self.client.user
         err = self.client.send_command("USER", self.client.user)
         if err:
             print("Error when sending user: ", err)
             return None
-
+        
+        #print "SEND>","LOGIN",self.client.user
         response, keyword, info = self.client.wait_command_result()
-        if response != OK:
+        if OK not in response:
             print("Got error when sending user", ' '.join([keyword, info]))
             return None
-
+        
+        
+        #print "SEND>","LOGIN",self.client.user
         err = self.client.send_command("PASS", self.client.password)
         if err:
             print("Error when sending password: ", err)
             return None
 
         response, keyword, info = self.client.wait_command_result()
-        if response != OK:
+        if OK not in response:
             print("Got error when sending password", ' '.join([keyword, info]))
             return None
 
@@ -136,7 +149,7 @@ class TransactionState():
             return None
 
         response, messages, octets = self.client.wait_command_result()
-        if response != OK:
+        if OK not in response:
             print("Got error when receiving status", ' '.join([messages, octets]))
             return None
 
@@ -148,7 +161,7 @@ class TransactionState():
                 continue
 
             response, octets, info = self.client.wait_command_result()
-            if response != OK:
+            if OK not in response:
                 print("Got error when receiving message", ' '.join([octets, info]))
                 continue
 
@@ -164,7 +177,7 @@ class TransactionState():
                 return None
 
             response, message, info = self.client.wait_command_result()
-            if response != OK:
+            if OK not in response:
                 print("Got error when receiving delete", ' '.join([message, info]))
                 return None
 

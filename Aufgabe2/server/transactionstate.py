@@ -30,18 +30,23 @@ class TransactionState():
 			not_deleted = self.handler.not_deleted_mails()
 			self.handler.send_response(status.OK, str(len(not_deleted)), "Messages")
 			for i, mail in enumerate(not_deleted):
-				self.handler.send_to_client(str(i) + " " + str(mail.size()) + "\r\n")
+				self.handler.send_to_client(str(i + 1) + " " + str(mail.size()) + "\r\n")
 
 			self.handler.send_to_client(".\r\n")
 		else:
 			index = -1
 			not_deleted = self.handler.not_deleted_mails()
+                        if len(content[0]) == 0:
+                            self.handler.send_error("Expected argument, got none")
+                            return
+                        
 			try:
 				index = int(content[0]) - 1
 			except:
 				self.handler.send_error("Invalid index")
+                                return
 
-			if len(not_deleted) <= index or index == -1:
+			if len(not_deleted) <= index or index < 0:
 				self.handler.send_error("Invalid message index")
 			else:
 				self.handler.send_response(status.OK, str(index), str(not_deleted[index].size()))
@@ -61,12 +66,17 @@ class TransactionState():
 			return
 
 		index = -1
+                if len(content[0]) == 0:
+                            self.handler.send_error("Expected argument, got none")
+                            return
+                
 		try:
 			index = int(content[0]) - 1
 		except:
 			self.handler.send_error("Invalid index")
+                        return
 
-		if len(self.handler.mails) <= index or index == -1:
+		if len(self.handler.mails) <= index or index < 0:
 			self.handler.send_error("Invalid message index")
 		else:
 			if self.handler.mails[index].deleted:
@@ -85,16 +95,22 @@ class TransactionState():
 			return
 
 		index = -1
+                if len(content[0]) == 0:
+                            self.handler.send_error("Expected argument, got none")
+                            return
+                
 		try:
 			index = int(content[0]) - 1
 		except:
 			self.handler.send_error("Invalid index")
+                        return
 
-		if len(self.handler.mails) <= index or index == -1:
+		if len(self.handler.mails) <= index or index < 0:
 			self.handler.send_error("Invalid message index")
 		else:
 			if self.handler.mails[index].deleted:
 				self.handler.send_error("Message is marked as deleted")
+                                return
 			else:
 				self.handler.mails[index].deleted = True
 				self.handler.send_response(status.OK, "Message", "deleted")
@@ -113,19 +129,24 @@ class TransactionState():
 			not_deleted = self.handler.not_deleted_mails()
 			self.handler.send_response(status.OK, str(len(not_deleted)), "Messages")
 			for i, mail in enumerate(not_deleted):
-				self.handler.send_to_client(str(i) + " " + mail.uid + "\r\n")
+				self.handler.send_to_client(str(i + 1) + " " + mail.uid + "\r\n")
 
 			self.handler.send_to_client(".\r\n")
 
 		else:
 			index = -1
+                        if len(content[0]) == 0:
+                            self.handler.send_error("Expected argument, got none")
+                            return
+                        
 			not_deleted = self.handler.not_deleted_mails()
 			try:
 				index = int(content[0]) - 1
 			except:
 				self.handler.send_error("Invalid index")
+                                return
 
-			if len(not_deleted) <= index or index == -1:
+			if len(not_deleted) <= index or index < 0:
 				self.handler.send_error("Invalid message index")
 			else:
 				self.handler.send_response(status.OK, str(index), not_deleted[index].uid)

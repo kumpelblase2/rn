@@ -83,7 +83,7 @@ class Server(object):
 	def get_account(self, username):
 		for accountDef in self.accounts:
 			account = self.accounts[accountDef]
-			if account['username'] == username:
+			if account['name'] == username:
 				return account
 
 		return None
@@ -100,6 +100,7 @@ def load_config():
 	servers = {}
 	for section in config.sections():
 		values = {}
+		values['name'] = section
 		for option in config.options(section):
 			try:
 				values[option] = config.get(section, option)
