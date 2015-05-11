@@ -213,7 +213,7 @@ def load_config():
 
     return servers
 
-def pull_for_server(config):
+def pull_for_server(config, scheduler):
     print("Starting mail collection for ", config.get('host','127.0.0.1'), config.get('port','110'))
     client, error = connect_to_server(config)
     if error:
@@ -221,12 +221,13 @@ def pull_for_server(config):
         return
 
     client.run()
+    scheduler.enter(10, 1, pull_for_server, [config, scheduler])
 
 def pull_mails(config):
     scheduler = sched.scheduler(time.time, time.sleep)
     for server in config:
         serverConfig = config[server]
-        scheduler.enter(10, 1, pull_for_server, [serverConfig])
+        scheduler.enter(10, 1, pull_for_server, [serverConfig, scheduler])
 
     scheduler.run()
 
