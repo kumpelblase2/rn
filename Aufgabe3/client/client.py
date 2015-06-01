@@ -3,17 +3,40 @@ import socket
 import select
 import struct
 import csv
+import sys
 
-UDP_IP = "localhost"
-UDP_PORT = 8080
+if len(sys.argv) != 3:
+	print "Invalid arguments"
+	exit(1)
+
+destinationInput = sys.argv[2]
+fileSplit = destinationInput.split(':', 1)
+if fileSplit[1].__contains__(':'):
+	portSplit = fileSplit[1].split(':', 1)
+	try:
+		port = int(portSplit[0])
+	except:
+		print "Invalid destination"
+		exit(1)
+	
+	destFile = portSplit[1]
+	address = fileSplit[0]
+else:
+	port = 8080
+	address = fileSplit[0]
+	destFile = fileSplit[1]
+
+UDP_IP = address
+UDP_PORT = port
 MESSAGE = "Hello, World!"
 
 transferlimit=5
 
-WindowSize=1008
+WindowSize=108
 HeadSize=8
 ErrorRate=100
-
+EXPRESPLEN=8
+MAXRECSIZE=1024
 
 print "UDP target IP:", UDP_IP
 print "UDP target port:", UDP_PORT
@@ -30,8 +53,8 @@ recAckCount=0
 RTTsum=0
 
 
-filename="test.jpg"
-destination="image/img.jpg"
+filename=sys.argv[1]
+destination=destFile
                      
 def readFile(fn,chunksize):
     f = open(fn, "rb")
@@ -52,11 +75,10 @@ def readFile(fn,chunksize):
         f.close()
     print len(blocks)
     return blocks
-                     
-                     
+
 def sequenznum(id=0):
     return struct.pack("Q", id)
-                     
+
 def firstmessage(PATH,SIZE,ERRORRATE):
     return "%s%s;%d;%d"%(sequenznum(),PATH,SIZE,ERRORRATE)
 
@@ -64,24 +86,21 @@ def datamessage(id,chunk):
     data=''.join(chunk)
     return "%s%s"%(sequenznum(id),data)
 
-                     
 def readUDP():
     r, w, e = select.select([sock], [], [],0)
     for s in r:
         if s is sock:
-            data, addr = sock.recvfrom(1024)
-            
-            if len(data)==8:
-                paketID=struct.unpack("Q",data[0:8])[0]
-                
+            data, addr = sock.recvfrom(MAXRECSIZE)
+
+            if len(data)==EXPRESPLEN:
+                paketID=struct.unpack("Q",data[0:EXPRESPLEN])[0]
+
                 #print "Pack %d was ACK"%(paketID,)
                 if(paketID>0):
                     setPacketAck(paketID)
-                    
-                    
+
             else:
                 print "WRONG ANSWER:",data,addr
-            
 
 def testComplete():
     for block in blocks:
@@ -134,8 +153,8 @@ def checkTimeout():
             if(block.get("timeout",0) < time.time()):
                 print "retransmit",i
                 timeoutCount+=1
-                sendPacket(i)
                 RTT.doubleRTO()
+                sendPacket(i)
                 
 
 class RetransmitTime:
@@ -148,6 +167,7 @@ class RetransmitTime:
         self.beta=0.25
         self.alpha=0.125
         self.first=True
+	self.RTTFAKTOR=4
     
     def calcRTO(self,newRTT):
         if(self.first==True):
@@ -156,7 +176,7 @@ class RetransmitTime:
             self.first=False
         self.rttVar  = (1-self.beta) * self.rttVar + self.beta * abs(self.SRTT - newRTT)
         self.SRTT    = (1-self.alpha) * self.SRTT + self.alpha * newRTT
-        self.RTO     = self.SRTT + 4 * self.rttVar 
+        self.RTO     = self.SRTT + self.RTTFAKTOR * self.rttVar 
         if self.RTO > self.RTOmax:
             print "RTOMAX!!!",self.RTO,
             self.RTO=self.RTOmax
@@ -169,17 +189,6 @@ class RetransmitTime:
 
 
 RTT=RetransmitTime()
-            
-
-
-'''
-for i,block in enumerate(blocks):
-    MESSAGE=datamessage(i+1,block["chunk"])
-    sock.sendto(MESSAGE, (UDP_IP, UDP_PORT))  
-    print "message:", "%s"%(MESSAGE,)
-    time.sleep(.001)
-    readUDP()
-'''
 
 
 log.append({"FileToSend":filename,"Destination":destination,"Windowsize":WindowSize,"Errorrate":ErrorRate})
@@ -213,7 +222,7 @@ print "zu sendende Pakete:",len(blocks)
 print "Gesendete Pakete:",sendCount    
 print "Verlorene Pakete:",timeoutCount    
 print "Bestaetigte Pakete:",recAckCount  
-print "avg. Roundtriptime:",RTTsum/recAckCount
+print "avg. Roundtriptime:%f s"%(RTTsum/recAckCount,)
 
 sendCount=0
 timeoutCount=0
