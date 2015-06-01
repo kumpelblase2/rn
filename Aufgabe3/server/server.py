@@ -40,7 +40,7 @@ def addResponse(msg,timetosend):
     if errorcount%errorrate!=0:
         ackresponse.append({"msg":msg,"time":timetosend,"send":0})
     else:
-        print "ACK DROPPED",msg
+        print "ACK DROPPED"
 
 def getAckResponse():
     for item in ackresponse:
@@ -83,7 +83,8 @@ class conLock:
     
     def conAccept(self,addr = None):
         if(self.lock and addr == self.addr):
-            print "Timeout cleared, rest was:%f"%self.clearTimeout()
+            t=self.clearTimeout()
+            #print "Timeout cleared, rest was:%f"%t
         return addr == self.addr or not self.lock
 
 def writeToFile(pakets):
@@ -126,8 +127,6 @@ def run():
                 if(Locker.conAccept(addr = addr)):
                     if len(data)<8:
                         if data=="FIN":
-                            for line in pakets:
-                                print line,pakets[line]
                             writeToFile(pakets)
                             Locker.unlock("Final Packet")
                     else:
@@ -143,17 +142,18 @@ def run():
                         
                         
                         if(Locker.isLocked()):
-                            packetnr=struct.unpack("Q",data[0:8])[0]
-                            transfer=data[8:]
-                            print "Got data from", addr
-                            print "PacketNR.:",packetnr
-                            print "received message:", transfer, len(transfer)
-                            print( "===========================" )
-                            if(packetnr>0):
-                                pakets[packetnr]=transfer
-                            addResponse(sequenznum(packetnr),time.time()+0.01)
-                            #sock.sendto("received: '%s'"%(data,), addr)
-            
+                            if(len(data)<=windowSize):
+                                packetnr=struct.unpack("Q",data[0:8])[0]
+                                transfer=data[8:]
+                                #print "Got data from", addr, "PacketNR.:",packetnr
+                                #print "received message:", transfer, len(transfer)
+                                #print( "===========================" )
+                                if(packetnr>0):
+                                    pakets[packetnr]=transfer
+                                addResponse(sequenznum(packetnr),time.time()+0.01)
+                                #sock.sendto("received: '%s'"%(data,), addr)
+                            else:
+                                print "WindowSizeError: ",len(data)
         if(Locker.isLocked()):
             packet=getAckResponse()
             if packet:

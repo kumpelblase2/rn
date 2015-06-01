@@ -2,13 +2,17 @@ import time
 import socket
 import select
 import struct
+import csv
 
 UDP_IP = "localhost"
 UDP_PORT = 8080
 MESSAGE = "Hello, World!"
 
-transferlimit=6
+transferlimit=5
 
+WindowSize=1008
+HeadSize=8
+ErrorRate=100
 
 
 print "UDP target IP:", UDP_IP
@@ -18,6 +22,17 @@ print "message:", MESSAGE
 sock = socket.socket(socket.AF_INET, # Internet
                      socket.SOCK_DGRAM) # UDP
 
+log=[]
+paketlog=[]
+sendCount=0
+timeoutCount=0
+recAckCount=0
+RTTsum=0
+
+
+filename="test.jpg"
+destination="image/img.jpg"
+                     
 def readFile(fn,chunksize):
     f = open(fn, "rb")
     try:
@@ -28,13 +43,14 @@ def readFile(fn,chunksize):
             # Do stuff with byte.
             chunk.append(byte)
             if(len(chunk)>=chunksize):
-                print "Chunk(%d)"%(len(blocks),),chunk
+                #print "Chunk(%d)"%(len(blocks),),chunk
                 blocks.append({"chunk":chunk,"send":0,"ack":0,"sendtime":0,"timeout":0,"firstsend":0})
                 chunk=[]
             byte = f.read(1)
         blocks.append({"chunk":chunk,"send":0,"ack":0,"sendtime":0,"timeout":0,"firstsend":0})
     finally:
         f.close()
+    print len(blocks)
     return blocks
                      
                      
@@ -58,11 +74,11 @@ def readUDP():
             if len(data)==8:
                 paketID=struct.unpack("Q",data[0:8])[0]
                 
-                print "Pack %d was ACK"%(paketID,)
+                #print "Pack %d was ACK"%(paketID,)
                 if(paketID>0):
                     setPacketAck(paketID)
-                    paketRTT=time.time()-blocks[paketID-1]["sendtime"]
-                    print "RTT:",(paketRTT)
+                    
+                    
             else:
                 print "WRONG ANSWER:",data,addr
             
@@ -74,8 +90,15 @@ def testComplete():
     return True
 
 def setPacketAck(id):
+    global RTTsum, recAckCount
     newRTT=time.time()-blocks[id-1]["sendtime"]
+    trans=blocks[id-1]["send"]
+    recAckCount+=1
+    RTTsum+=newRTT
     RTT.calcRTO(newRTT)
+    paketlog.append({"PaketID":id,"paketRTT":newRTT,"transmitions":trans,"RTO":RTT.RTO})
+    
+    
     blocks[id-1]["ack"]=1
     
     
@@ -92,14 +115,9 @@ def getNextBlockID():
             #print "nextID found ",i
             return i
     return None
-            
-
-
- 
-WindowSize=50
-ErrorRate=100
 
 def sendPacket(id):
+    global sendCount
     blocks[id]["send"]+=1
     blocks[id]["timeout"]=time.time()+RTT.RTO
     blocks[id]["sendtime"]=time.time()
@@ -107,12 +125,15 @@ def sendPacket(id):
         blocks[id]["firstsend"]=time.time()
     MESSAGE = datamessage(id+1,blocks[id]["chunk"])
     sock.sendto(MESSAGE, (UDP_IP, UDP_PORT))
+    sendCount+=1
     
 def checkTimeout():
+    global timeoutCount
     for i,block in enumerate(blocks):
         if(block.get("ack",0)==0 and block.get("send",0)!=0):
             if(block.get("timeout",0) < time.time()):
                 print "retransmit",i
+                timeoutCount+=1
                 sendPacket(i)
                 RTT.doubleRTO()
                 
@@ -139,7 +160,7 @@ class RetransmitTime:
         if self.RTO > self.RTOmax:
             print "RTOMAX!!!",self.RTO,
             self.RTO=self.RTOmax
-        print "RTO",(newRTT,self.RTO,self.SRTT,self.rttVar)
+        #print "RTO",(newRTT,self.RTO,self.SRTT,self.rttVar)
       
     def doubleRTO(self):
         self.RTO+=self.RTO
@@ -149,7 +170,7 @@ class RetransmitTime:
 
 RTT=RetransmitTime()
             
-blocks=readFile("file.pdf",WindowSize)
+
 
 '''
 for i,block in enumerate(blocks):
@@ -161,10 +182,13 @@ for i,block in enumerate(blocks):
 '''
 
 
-sock.sendto(firstmessage("a/speciel/dir/file.pdf",WindowSize,ErrorRate) ,(UDP_IP, UDP_PORT))
+log.append({"FileToSend":filename,"Destination":destination,"Windowsize":WindowSize,"Errorrate":ErrorRate})
+blocks=readFile(filename,WindowSize-HeadSize)
+sock.sendto(firstmessage(destination,WindowSize,ErrorRate) ,(UDP_IP, UDP_PORT))
 
+startTime=time.time()
 while not testComplete():
-    time.sleep(.001) 
+    time.sleep(.000001) 
     readUDP()
     if packetsPending()<transferlimit:
         #print "send more Packets"
@@ -174,19 +198,25 @@ while not testComplete():
             #print "next",nextID
             sendPacket(nextID)
     checkTimeout()
-
+endeTime=time.time()
 sock.sendto("FIN", (UDP_IP, UDP_PORT))      
 
-       
-print testComplete()
+with open('log.csv', 'wb') as logfile:
+    csv_writer = csv.writer(logfile)
+    csv_writer.writerow( ('PaketID', 'Transmitions', 'RTT','RTO') )
+    for lnr in paketlog:
+        csv_writer.writerow((lnr["PaketID"],lnr["transmitions"],lnr["paketRTT"],lnr["RTO"]))
 
-blocks[0]["send"]=1
-print getNextBlockID()
-print packetsPending()
+    
+print "Datei gesendet in: %f s"%(endeTime-startTime,)
+print "zu sendende Pakete:",len(blocks)    
+print "Gesendete Pakete:",sendCount    
+print "Verlorene Pakete:",timeoutCount    
+print "Bestaetigte Pakete:",recAckCount  
+print "avg. Roundtriptime:",RTTsum/recAckCount
 
-for block in blocks:
-    block["ack"]=1
-
-print testComplete()
-
+sendCount=0
+timeoutCount=0
+recAckCount=0
+RTTsum=0
 time.sleep(3)

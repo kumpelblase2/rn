@@ -1,0 +1,16 @@
+testtext
+testline
+fooo bar
+äöü ÄÖÜ
+SENDING
+{"measurements": [[{"mValue": 41.6, "mKey": "Humidity"}, {"mValue": 342, "mKey": "CO-Level"}, {"mValue": 217, "mKey": "AirQuality"}, {"mValue": 21.7, "mKey": "Temperature"}]], "date": "2015-03-20T$H:$M:$SZ", "location": "DE.HH.ALTON
+A.GAUSSSTRASSE.HUB.SPEEDUP", "device": {"id": "DEV_deadbeef", "version": "1.0_al
+pha"}}
+
+
+
+def loadSample():
+    ser.flushInput()
+    #ser.write("lastSample")
+    sampleRaw=stringToArray(ser.readline().decode('utf-8'))
+    return sampleRaw
