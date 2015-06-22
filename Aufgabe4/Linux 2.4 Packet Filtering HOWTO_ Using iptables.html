@@ -1,0 +1,892 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<!-- saved from url=(0125)https://pub.informatik.haw-hamburg.de/home/pub/staff/schulz_hartmut/Rechnernetze/tools/iptables/packet-filtering-HOWTO-7.html -->
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=windows-1252">
+
+
+ <meta name="GENERATOR" content="LinuxDoc-Tools 0.9.21"><title>Linux 2.4 Packet Filtering HOWTO: Using iptables</title>
+ 
+ <link href="http://www.netfilter.org/documentation/HOWTO//packet-filtering-HOWTO-8.html" rel="next">
+ <link href="http://www.netfilter.org/documentation/HOWTO//packet-filtering-HOWTO-6.html" rel="previous">
+ <link href="http://www.netfilter.org/documentation/HOWTO//packet-filtering-HOWTO.html#toc7" rel="contents"><style type="text/css"></style></head><body>
+<a href="http://www.netfilter.org/documentation/HOWTO//packet-filtering-HOWTO-8.html">Next</a>
+<a href="http://www.netfilter.org/documentation/HOWTO//packet-filtering-HOWTO-6.html">Previous</a>
+<a href="http://www.netfilter.org/documentation/HOWTO//packet-filtering-HOWTO.html#toc7">Contents</a>
+<hr>
+<h2><a name="s7">7.</a> <a href="http://www.netfilter.org/documentation/HOWTO//packet-filtering-HOWTO.html#toc7">Using iptables</a></h2>
+
+<p>iptables has a fairly detailed manual page (<code>man iptables</code>),
+and if you need more detail on particulars.  Those of you familiar
+with ipchains may simply want to look at 
+<a href="http://www.netfilter.org/documentation/HOWTO//packet-filtering-HOWTO-10.html#Appendix-A">Differences Between iptables and ipchains</a>; they are very
+similar.</p>
+
+<p>There are several different things you can do with <code>iptables</code>.
+You start with three built-in chains <code>INPUT</code>, <code>OUTPUT</code>
+and <code>FORWARD</code> which you can't delete.  Let's look at the
+operations to manage whole chains:</p>
+<p>
+</p><ol>
+<li> Create a new chain (-N).</li>
+<li> Delete an empty chain (-X).</li>
+<li> Change the policy for a built-in chain. (-P).</li>
+<li> List the rules in a chain (-L).</li>
+<li> Flush the rules out of a chain (-F).</li>
+<li> Zero the packet and byte counters on all rules in a chain (-Z).</li>
+</ol>
+<p></p>
+<p>There are several ways to manipulate rules inside a chain:</p>
+<p>
+</p><ol>
+<li> Append a new rule to a chain (-A).</li>
+<li> Insert a new rule at some position in a chain (-I).</li>
+<li> Replace a rule at some position in a chain (-R).</li>
+<li> Delete a rule at some position in a chain, or the first that matches (-D).</li>
+</ol>
+<p></p>
+
+<h2><a name="ss7.1">7.1</a> <a href="http://www.netfilter.org/documentation/HOWTO//packet-filtering-HOWTO.html#toc7.1">What You'll See When Your Computer Starts Up</a>
+</h2>
+
+<p>iptables may be a module, called (`iptable_filter.o'), which should be
+automatically loaded when you first run <code>iptables</code>.  It can
+also be built into the kernel permenantly.</p>
+
+<p>Before any iptables commands have been run (be careful: some
+distributions will run iptables in their initialization scripts),
+there will be no rules in any of the built-in chains (`INPUT',
+`FORWARD' and `OUTPUT'), all the chains will have a policy of ACCEPT.
+You can alter the default policy of the FORWARD chain by providing the
+`forward=0' option to the iptable_filter module.</p>
+
+<h2><a name="ss7.2">7.2</a> <a href="http://www.netfilter.org/documentation/HOWTO//packet-filtering-HOWTO.html#toc7.2">Operations on a Single Rule</a>
+</h2>
+
+<p>This is the bread-and-butter of packet filtering; manipulating rules.
+Most commonly, you will probably use the append (-A) and delete (-D)
+commands.  The others (-I for insert and -R for replace) are simple
+extensions of these concepts.</p>
+
+<p>Each rule specifies a set of conditions the packet must meet, and what
+to do if it meets them (a `target').  For example, you might want to
+drop all ICMP packets coming from the IP address 127.0.0.1.  So in
+this case our conditions are that the protocol must be ICMP and that
+the source address must be 127.0.0.1.  Our target is `DROP'.</p>
+
+<p>127.0.0.1 is the `loopback' interface, which you will have even if you
+have no real network connection.  You can use the `ping' program to
+generate such packets (it simply sends an ICMP type 8 (echo request)
+which all cooperative hosts should obligingly respond to with an ICMP
+type 0 (echo reply) packet).  This makes it useful for testing.</p>
+<p>
+</p><blockquote><code>
+</code><pre># ping -c 1 127.0.0.1
+PING 127.0.0.1 (127.0.0.1): 56 data bytes
+64 bytes from 127.0.0.1: icmp_seq=0 ttl=64 time=0.2 ms
+
+--- 127.0.0.1 ping statistics ---
+1 packets transmitted, 1 packets received, 0% packet loss
+round-trip min/avg/max = 0.2/0.2/0.2 ms
+# iptables -A INPUT -s 127.0.0.1 -p icmp -j DROP
+# ping -c 1 127.0.0.1
+PING 127.0.0.1 (127.0.0.1): 56 data bytes
+
+--- 127.0.0.1 ping statistics ---
+1 packets transmitted, 0 packets received, 100% packet loss
+#
+</pre>
+</blockquote>
+<p></p>
+<p>You can see here that the first ping succeeds (the `-c 1' tells ping
+to only send a single packet).</p>
+
+<p>Then we append (-A) to the `INPUT' chain, a rule specifying that for
+packets from 127.0.0.1 (`-s 127.0.0.1') with protocol ICMP (`-p icmp')
+we should jump to DROP (`-j DROP').</p>
+
+<p>Then we test our rule, using the second ping.  There will be a pause
+before the program gives up waiting for a response that will never
+come.</p>
+
+<p>We can delete the rule in one of two ways.  Firstly, since we know
+that it is the only rule in the input chain, we can use a numbered
+delete, as in:
+</p><blockquote><code>
+</code><pre>        # iptables -D INPUT 1
+        #
+</pre>
+</blockquote>
+
+To delete rule number 1 in the INPUT chain.<p></p>
+
+<p>The second way is to mirror the -A command, but replacing the -A with
+-D.  This is useful when you have a complex chain of rules and you
+don't want to have to count them to figure out that it's rule 37 that
+you want to get rid of.  In this case, we would use:
+</p><blockquote><code>
+</code><pre>        # iptables -D INPUT -s 127.0.0.1 -p icmp -j DROP
+        #
+</pre>
+</blockquote>
+
+The syntax of -D must have exactly the same options as the -A (or -I
+or -R) command.  If there are multiple identical rules in the same
+chain, only the first will be deleted.<p></p>
+
+<h2><a name="ss7.3">7.3</a> <a href="http://www.netfilter.org/documentation/HOWTO//packet-filtering-HOWTO.html#toc7.3">Filtering Specifications</a>
+</h2>
+
+<p>We have seen the use of `-p' to specify protocol, and `-s' to specify
+source address, but there are other options we can use to specify
+packet characteristics.  What follows is an exhaustive compendium.</p>
+
+<h3>Specifying Source and Destination IP Addresses</h3>
+
+<p>Source (`-s', `--source' or `--src') and destination (`-d',
+`--destination' or `--dst') IP addresses can be specified in four
+ways.  The most common way is to use the full name, such as
+`localhost' or `www.linuxhq.com'.  The second way is to specify the IP
+address such as `127.0.0.1'.</p>
+
+<p>The third and fourth ways allow specification of a group of IP
+addresses, such as `199.95.207.0/24' or `199.95.207.0/255.255.255.0'.
+These both specify any IP address from 199.95.207.0 to 199.95.207.255
+inclusive; the digits after the `/' tell which parts of the IP address
+are significant.  `/32' or `/255.255.255.255' is the default (match
+all of the IP address).  To specify any IP address at all `/0' can be
+used, like so:
+</p><blockquote><code>
+</code><pre>        [ NOTE: `-s 0/0' is redundant here. ]
+        # iptables -A INPUT -s 0/0 -j DROP
+        #
+</pre>
+</blockquote>
+<p></p>
+<p>This is rarely used, as the effect above is the same as not specifying
+the `-s' option at all.</p>
+
+<h3>Specifying Inversion</h3>
+
+<p>Many flags, including the `-s' (or `--source') and `-d'
+(`--destination') flags can have their arguments preceded by `!'
+(pronounced `not') to match addresses NOT equal to the ones given.
+For example. `-s ! localhost' matches any packet <b>not</b> coming
+from localhost.</p>
+
+<h3>Specifying Protocol</h3>
+
+<p>The protocol can be specified with the `-p' (or `--protocol') flag.
+Protocol can be a number (if you know the numeric protocol values for
+IP) or a name for the special cases of `TCP', `UDP' or `ICMP'.  Case
+doesn't matter, so `tcp' works as well as `TCP'.</p>
+
+<p>The protocol name can be prefixed by a `!', to invert it, such as `-p
+! TCP' to specify packets which are <b>not</b> TCP.</p>
+
+<h3>Specifying an Interface</h3>
+
+<p>The `-i' (or `--in-interface') and `-o' (or `--out-interface') options
+specify the name of an <b>interface</b> to match.  An interface is
+the physical device the packet came in on (`-i') or is going out on
+(`-o').  You can use the <code>ifconfig</code> command to list the
+interfaces which are `up' (i.e., working at the moment).</p>
+
+<p>Packets traversing the <code>INPUT</code> chain don't have an output
+interface, so any rule using `-o' in this chain will never match.
+Similarly, packets traversing the <code>OUTPUT</code> chain don't have an
+input interface, so any rule using `-i' in this chain will never match.</p>
+
+<p>Only packets traversing the <code>FORWARD</code> chain have both an
+input and output interface.</p>
+
+<p>It is perfectly legal to specify an interface that currently does not
+exist; the rule will not match anything until the interface comes up.
+This is extremely useful for dial-up PPP links (usually interface
+<code>ppp0</code>) and the like.</p>
+
+<p>As a special case, an interface name ending with a `+' will match all
+interfaces (whether they currently exist or not) which begin with that
+string.  For example, to specify a rule which matches all PPP
+interfaces, the <code>-i ppp+</code> option would be used.</p>
+
+<p>The interface name can be preceded by a `!' with spaces around it, to
+match a packet which does <b>not</b> match the specified
+interface(s), eg <code>-i ! ppp+</code>.</p>
+
+<h3>Specifying Fragments</h3>
+
+<p>Sometimes a packet is too large to fit down a wire all at once.  When
+this happens, the packet is divided into <b>fragments</b>, and sent
+as multiple packets.  The other end reassembles these fragments to
+reconstruct the whole packet.</p>
+
+<p>The problem with fragments is that the initial fragment has the
+complete header fields (IP + TCP, UDP and ICMP) to examine, but
+subsequent packets only have a subset of the headers (IP without the
+additional protocol fields).  Thus looking inside subsequent fragments
+for protocol headers (such as is done by the TCP, UDP and ICMP
+extensions) is not possible.</p>
+
+<p>If you are doing connection tracking or NAT, then all fragments will
+get merged back together before they reach the packet filtering code,
+so you need never worry about fragments.</p>
+
+<p>Please also note that in the INPUT chain of the filter table (or any other
+table hooking into the NF_IP_LOCAL_IN hook) is traversed after
+defragmentation of the core IP stack.</p>
+
+<p>Otherwise, it is important to understand how fragments get treated by
+the filtering rules.  Any filtering rule that asks for information we
+don't have will <em>not</em> match.  This means that the first fragment is
+treated like any other packet.  Second and further fragments won't be.
+Thus a rule <code>-p TCP --sport www</code> (specifying a source port of
+`www') will never match a fragment (other than the first fragment).
+Neither will the opposite rule <code>-p TCP --sport ! www</code>.</p>
+
+<p>However, you can specify a rule specifically for second and further
+fragments, using the `-f' (or `--fragment') flag.  It is also legal to
+specify that a rule does <em>not</em> apply to second and further
+fragments, by preceding the `-f' with ` ! '.</p>
+
+<p>Usually it is regarded as safe to let second and further fragments
+through, since filtering will effect the first fragment, and thus
+prevent reassembly on the target host; however, bugs have been known
+to allow crashing of machines simply by sending fragments.  Your call.</p>
+
+<p>Note for network-heads: malformed packets (TCP, UDP and ICMP packets
+too short for the firewalling code to read the ports or ICMP code and
+type) are dropped when such examinations are attempted.  So are TCP
+fragments starting at position 8.</p>
+
+<p>As an example, the following rule will drop any fragments going to
+192.168.1.1:</p>
+<p>
+</p><blockquote><code>
+</code><pre># iptables -A OUTPUT -f -d 192.168.1.1 -j DROP
+#
+</pre>
+</blockquote>
+<p></p>
+
+<h3>Extensions to iptables: New Matches</h3>
+
+<p><code>iptables</code> is <b>extensible</b>, meaning that both the
+kernel and the iptables tool can be extended to provide new features.</p>
+
+<p>Some of these extensions are standard, and other are more exotic.
+Extensions can be made by other people and distributed separately for
+niche users.</p>
+
+<p>Kernel extensions normally live in the kernel module subdirectory,
+such as /lib/modules/2.4.0-test10/kernel/net/ipv4/netfilter.  They are demand loaded if your
+kernel was compiled with CONFIG_KMOD set, so you should not need to
+manually insert them.</p>
+
+<p>Extensions to the iptables program are shared libraries which
+usually live in /usr/local/lib/iptables/, although a distribution
+would put them in /lib/iptables or /usr/lib/iptables.</p>
+
+<p>Extensions come in two types: new targets, and new matches (we'll
+talk about new targets a little later).  Some protocols automatically
+offer new tests: currently these are TCP, UDP and ICMP as shown below.</p>
+
+<p>For these you will be able to specify the new tests on the command
+line after the `-p' option, which will load the extension.  For
+explicit new tests, use the `-m' option to load the extension, after
+which the extended options will be available.</p>
+
+<p>To get help on an extension, use the option to load it (`-p', `-j' or
+`-m') followed by `-h' or `--help', eg:
+</p><blockquote><code>
+</code><pre># iptables -p tcp --help
+#
+</pre>
+</blockquote>
+<p></p>
+
+<h3>TCP Extensions</h3>
+
+<p>The TCP extensions are automatically loaded if `-p tcp' is specified.
+It provides the following options (none of which match fragments).</p>
+
+<p>
+</p><dl>
+<dt><b>--tcp-flags</b></dt><dd><p>Followed by an optional `!', then two strings
+of flags, allows you to filter on specific TCP flags.  The first
+string of flags is the mask: a list of flags you want to examine.  The
+second string of flags tells which one(s) should be set.  For example,</p>
+<p>
+</p><blockquote><code>
+</code><pre># iptables -A INPUT --protocol tcp --tcp-flags ALL SYN,ACK -j DROP
+</pre>
+</blockquote>
+<p></p>
+<p>This indicates that all flags should be examined (`ALL' is synonymous
+with `SYN,ACK,FIN,RST,URG,PSH'), but only SYN and ACK should be set.
+There is also an argument `NONE' meaning no flags.</p>
+
+</dd><dt><b>--syn</b></dt><dd><p>Optionally preceded by a `!', this is shorthand
+for `--tcp-flags SYN,RST,ACK SYN'.</p>
+
+</dd><dt><b>--source-port</b></dt><dd><p>followed by an optional `!', then either a
+single TCP port, or a range of ports.  Ports can be port names, as
+listed in /etc/services, or numeric.  Ranges are either two port names
+separated by a `:', or (to specify greater than or equal to a given
+port) a port with a `:' appended, or (to specify less than or equal to
+a given port), a port preceded by a `:'.</p>
+
+</dd><dt><b>--sport</b></dt><dd><p>is synonymous with `--source-port'.</p>
+
+</dd><dt><b>--destination-port</b></dt><dd><p>and </p>
+</dd><dt><b>--dport</b></dt><dd><p>are the same as
+above, only they specify the destination, rather than source, port to
+match.</p>
+
+</dd><dt><b>--tcp-option</b></dt><dd><p>followed by an optional `!' and a number,
+matches a packet with a TCP option equaling that number.  A packet
+which does not have a complete TCP header is dropped automatically if
+an attempt is made to examine its TCP options.</p>
+</dd></dl>
+<p></p>
+
+<h3>An Explanation of TCP Flags</h3>
+
+<p>It is sometimes useful to allow TCP connections in one direction, but
+not the other.  For example, you might want to allow connections to an
+external WWW server, but not connections from that server.</p>
+
+<p>The naive approach would be to block TCP packets coming from the
+server.  Unfortunately, TCP connections require packets going in both
+directions to work at all.</p>
+
+<p>The solution is to block only the packets used to request a
+connection.  These packets are called <b>SYN</b> packets (ok,
+technically they're packets with the SYN flag set, and the RST and ACK
+flags cleared, but we call them SYN packets for short).  By
+disallowing only these packets, we can stop attempted connections in
+their tracks.</p>
+
+<p>The `--syn' flag is used for this: it is only valid for rules which
+specify TCP as their protocol.  For example, to specify TCP connection
+attempts from 192.168.1.1:
+</p><blockquote><code>
+</code><pre>-p TCP -s 192.168.1.1 --syn
+</pre>
+</blockquote>
+<p></p>
+
+<p>This flag can be inverted by preceding it with a `!', which means
+every packet other than the connection initiation.</p>
+
+<h3>UDP Extensions</h3>
+
+<p>These extensions are automatically loaded if `-p udp' is specified.
+It provides the options `--source-port', `--sport',
+`--destination-port' and `--dport' as detailed for TCP above.</p>
+
+<h3>ICMP Extensions</h3>
+
+<p>This extension is automatically loaded if `-p icmp' is specified.  It
+provides only one new option:</p>
+
+<p>
+</p><dl>
+<dt><b>--icmp-type</b></dt><dd><p>followed by an optional `!', then either an
+icmp type name (eg `host-unreachable'), or a numeric type (eg. `3'),
+or a numeric type and code separated by a `/' (eg. `3/3').  A list
+of available icmp type names is given using `-p icmp --help'.</p>
+</dd></dl>
+<p></p>
+
+<h3>Other Match Extensions</h3>
+
+<p>The other extensions in the netfilter package are demonstration
+extensions, which (if installed) can be invoked with the `-m' option.</p>
+<p>
+</p><dl>
+<dt><b>mac</b></dt><dd><p>This module must be explicitly specified with `-m mac'
+or `--match mac'.  It is used for matching incoming packet's source
+Ethernet (MAC) address, and thus only useful for packets traversing
+the PREROUTING and INPUT chains.  It provides only one option:</p>
+<p>
+</p><dl>
+<dt><b>--mac-source</b></dt><dd><p>followed by an optional `!', then an
+ethernet address in colon-separated hexbyte notation, eg
+`--mac-source 00:60:08:91:CC:B7'.</p>
+</dd></dl>
+<p></p>
+
+</dd><dt><b>limit</b></dt><dd><p>This module must be explicitly specified with `-m
+limit' or `--match limit'.  It is used to restrict the rate of
+matches, such as for suppressing log messages.  It will only match a
+given number of times per second (by default 3 matches per hour,
+with a burst of 5).  It takes two optional arguments:</p>
+<p>
+</p><dl>
+<dt><b>--limit</b></dt><dd><p>followed by a number; specifies the maximum
+average number of matches to allow per second.  The number can
+specify units explicitly, using `/second', `/minute', `/hour' or
+`/day', or parts of them (so `5/second' is the same as `5/s').</p>
+
+</dd><dt><b>--limit-burst</b></dt><dd><p>followed by a number, indicating the
+maximum burst before the above limit kicks in.</p>
+</dd></dl>
+<p></p>
+<p>This match can often be used with the LOG target to do rate-limited
+logging.  To understand how it works, let's look at the following
+rule, which logs packets with the default limit parameters:</p>
+<p>
+</p><blockquote><code>
+</code><pre># iptables -A FORWARD -m limit -j LOG
+</pre>
+</blockquote>
+<p></p>
+<p>The first time this rule is reached, the packet will be logged; in
+fact, since the default burst is 5, the first five packets will be
+logged.  After this, it will be twenty minutes before a packet will be
+logged from this rule, regardless of how many packets reach it.  Also,
+every twenty minutes which passes without matching a packet, one of
+the burst will be regained; if no packets hit the rule for 100
+minutes, the burst will be fully recharged; back where we started.</p>
+
+<p>Note: you cannot currently create a rule with a recharge time
+greater than about 59 hours, so if you set an average rate of one per
+day, then your burst rate must be less than 3.</p>
+
+<p>You can also use this module to avoid various denial of service
+attacks (DoS) with a faster rate to increase responsiveness.</p>
+
+<p>Syn-flood protection:
+</p><blockquote><code>
+</code><pre># iptables -A FORWARD -p tcp --syn -m limit --limit 1/s -j ACCEPT
+</pre>
+</blockquote>
+<p></p>
+<p>Furtive port scanner:
+</p><blockquote><code>
+</code><pre># iptables -A FORWARD -p tcp --tcp-flags SYN,ACK,FIN,RST RST -m limit --limit 1/s -j ACCEPT
+</pre>
+</blockquote>
+<p></p>
+<p>Ping of death:
+</p><blockquote><code>
+</code><pre># iptables -A FORWARD -p icmp --icmp-type echo-request -m limit --limit 1/s -j ACCEPT
+</pre>
+</blockquote>
+<p></p>
+<p>This module works like a "hysteresis door", as shown in the graph
+below.  </p>
+<p>
+</p><blockquote><code>
+</code><pre>       rate (pkt/s)  
+             ^        .---.
+             |       / DoS \
+             |      /       \
+Edge of DoS -|.....:.........\.......................
+ = (limit *  |    /:          \
+limit-burst) |   / :           \         .-.
+             |  /  :            \       /   \
+             | /   :             \     /     \
+End of DoS  -|/....:..............:.../.......\..../.
+ = limit     |     :              :`-'         `--'
+-------------+-----+--------------+------------------&gt; time (s)
+   LOGIC =&gt;  Match | Didn't Match |    Match
+</pre>
+</blockquote>
+<p></p>
+<p>Say we say match one packet per second with a five packet
+burst, but packets start coming in at four per second, for three
+seconds, then start again in another three seconds.
+</p><blockquote><code>
+</code><pre>
+        &lt;--Flood 1--&gt;           &lt;---Flood 2---&gt;
+
+Total  ^                   Line  __--      YNNN
+Packets|               Rate  __--      YNNN
+       |            mum  __--      YNNN
+    10 |        Maxi __--         Y
+       |         __--            Y
+       |     __--               Y
+       | __--    YNNN           
+       |-    YNNN
+     5 |    Y    
+       |   Y                                Key:  Y -&gt; Matched Rule
+       |  Y                                       N -&gt; Didn't Match Rule
+       | Y
+       |Y 
+     0 +--------------------------------------------------&gt;  Time (seconds)
+        0   1   2   3   4   5   6   7   8   9  10  11  12
+</pre>
+</blockquote>
+<p></p>
+<p>You can see that the first five packets are allowed to exceed the one
+packet per second, then the limiting kicks in.  If there is a pause,
+another burst is allowed but not past the maximum rate set by the
+rule (1 packet per second after the burst is used).</p>
+
+</dd><dt><b>owner</b></dt><dd><p>This module attempts to match various characteristics of the packet
+creator, for locally-generated packets.  It is only valid in the
+OUTPUT chain, and even then some packets (such as ICMP ping responses)
+may have no owner, and hence never match.</p>
+<p>
+</p><dl>
+<dt><b>--uid-owner userid</b></dt><dd><p>Matches if the packet was created by a process with the given
+effective (numerical) user id.</p>
+</dd><dt><b>--gid-owner groupid</b></dt><dd><p>Matches if the packet was created by a process with the given
+effective (numerical) group id.</p>
+</dd><dt><b>--pid-owner processid</b></dt><dd><p>Matches if the packet was created by a process with the given
+process id.</p>
+</dd><dt><b>--sid-owner sessionid</b></dt><dd><p>Matches if the packet was created by a process in the given session
+group.</p>
+</dd></dl>
+<p></p>
+
+</dd><dt><b>unclean</b></dt><dd><p>This experimental module must be explicitly
+specified with `-m unclean or `--match unclean'.  It does various
+random sanity checks on packets.  This module has not been audited,
+and should not be used as a security device (it probably makes things
+worse, since it may well have bugs itself).  It provides no options.</p>
+</dd></dl>
+<p></p>
+
+<h3>The State Match</h3>
+
+<p>The most useful match criterion is supplied by the `state'
+extension, which interprets the connection-tracking analysis of the
+`ip_conntrack' module.  This is highly recommended.</p>
+
+<p>Specifying `-m state' allows an additional `--state' option, which
+is a comma-separated list of states to match (the `!'  flag indicates
+<b>not</b> to match those states).  These states are:</p>
+<p>
+</p><dl>
+<dt><b>NEW</b></dt><dd><p>A packet which creates a new connection.</p>
+
+</dd><dt><b>ESTABLISHED</b></dt><dd><p>A packet which belongs to an existing
+connection (i.e., a reply packet, or outgoing packet on a connection
+which has seen replies).</p>
+
+</dd><dt><b>RELATED</b></dt><dd><p>A packet which is related to, but not part of, an
+existing connection, such as an ICMP error, or (with the FTP module
+inserted), a packet establishing an ftp data connection.</p>
+
+</dd><dt><b>INVALID</b></dt><dd><p>A packet which could not be identified for some
+reason: this includes running out of memory and ICMP errors which
+don't correspond to any known connection.  Generally these packets
+should be dropped.</p>
+</dd></dl>
+<p></p>
+<p>An example of this powerful match extension would be: 
+</p><blockquote><code>
+</code><pre># iptables -A FORWARD -i ppp0 -m state ! --state NEW -j DROP
+</pre>
+</blockquote>
+<p></p>
+
+<h2><a name="ss7.4">7.4</a> <a href="http://www.netfilter.org/documentation/HOWTO//packet-filtering-HOWTO.html#toc7.4">Target Specifications</a>
+</h2>
+
+<p>Now we know what examinations we can do on a packet, we need a way
+of saying what to do to the packets which match our tests.  This is
+called a rule's <b>target</b>.</p>
+
+<p>There are two very simple built-in targets: DROP and ACCEPT.  We've
+already met them.  If a rule matches a packet and its target is one of
+these two, no further rules are consulted: the packet's fate has been
+decided.</p>
+
+<p>There are two types of targets other than the built-in ones:
+extensions and user-defined chains.</p>
+
+<h3>User-defined chains</h3>
+
+<p>One powerful feature which <code>iptables</code> inherits from
+<code>ipchains</code> is the ability for the user to create new chains, in
+addition to the three built-in ones (INPUT, FORWARD and OUTPUT).  By
+convention, user-defined chains are lower-case to distinguish them
+(we'll describe how to create new user-defined chains below in 
+<a href="https://pub.informatik.haw-hamburg.de/home/pub/staff/schulz_hartmut/Rechnernetze/tools/iptables/packet-filtering-HOWTO-7.html#chain-ops">Operations on an Entire Chain</a>).</p>
+
+<p>When a packet matches a rule whose target is a user-defined chain, the
+packet begins traversing the rules in that user-defined chain.  If
+that chain doesn't decide the fate of the packet, then once traversal
+on that chain has finished, traversal resumes on the next rule in the
+current chain.</p>
+
+<p>Time for more ASCII art.  Consider two (silly) chains: <code>INPUT</code> (the
+built-in chain) and <code>test</code> (a user-defined chain).</p>
+<p>
+</p><blockquote><code>
+</code><pre>         `INPUT'                         `test'
+        ----------------------------    ----------------------------
+        | Rule1: -p ICMP -j DROP   |    | Rule1: -s 192.168.1.1    |
+        |--------------------------|    |--------------------------|
+        | Rule2: -p TCP -j test    |    | Rule2: -d 192.168.1.1    |
+        |--------------------------|    ----------------------------
+        | Rule3: -p UDP -j DROP    |
+        ----------------------------
+</pre>
+</blockquote>
+<p></p>
+
+<p>Consider a TCP packet coming from 192.168.1.1, going to 1.2.3.4.  It
+enters the <code>INPUT</code> chain, and gets tested against Rule1 - no match.
+Rule2 matches, and its target is <code>test</code>, so the next rule examined
+is the start of <code>test</code>.  Rule1 in <code>test</code> matches, but doesn't
+specify a target, so the next rule is examined, Rule2.  This doesn't
+match, so we have reached the end of the chain.  We return to the
+<code>INPUT</code> chain, where we had just examined Rule2, so we now examine
+Rule3, which doesn't match either.</p>
+
+<p>So the packet path is:
+</p><blockquote><code>
+</code><pre>                                v    __________________________
+         `INPUT'                |   /    `test'                v
+        ------------------------|--/    -----------------------|----
+        | Rule1                 | /|    | Rule1                |   |
+        |-----------------------|/-|    |----------------------|---|
+        | Rule2                 /  |    | Rule2                |   |
+        |--------------------------|    -----------------------v----
+        | Rule3                 /--+___________________________/
+        ------------------------|---
+                                v
+</pre>
+</blockquote>
+<p></p>
+
+<p>User-defined chains can jump to other user-defined chains (but
+don't make loops: your packets will be dropped if they're found to
+be in a loop).</p>
+
+<h3>Extensions to iptables: New Targets</h3>
+
+<p>The other type of extension is a target.  A target extension
+consists of a kernel module, and an optional extension to
+<code>iptables</code> to provide new command line options.  There are
+several extensions in the default netfilter distribution:</p>
+<p>
+</p><dl>
+<dt><b>LOG</b></dt><dd><p>This module provides kernel logging of matching
+packets.  It provides these additional options:
+</p><dl>
+<dt><b>--log-level</b></dt><dd><p>Followed by a level number or name.  Valid
+names are (case-insensitive) `debug', `info', `notice', `warning',
+`err', `crit', `alert' and `emerg', corresponding to numbers 7
+through 0.  See the man page for syslog.conf for an explanation of
+these levels.  The default is `warning'.</p>
+
+</dd><dt><b>--log-prefix</b></dt><dd><p>Followed by a string of up to 29 characters,
+this message is sent at the start of the log message, to allow it to
+be uniquely identified.</p>
+</dd></dl>
+<p></p>
+<p>This module is most useful after a limit match, so you don't flood
+your logs.</p>
+
+</dd><dt><b>REJECT</b></dt><dd><p>This module has the same effect as `DROP', except
+that the sender is sent an ICMP `port unreachable' error message.
+Note that the ICMP error message is not sent if (see RFC 1122):</p>
+<p>
+</p><ul>
+<li> The packet being filtered was an ICMP error message in the
+first place, or some unknown ICMP type.
+</li>
+<li> The packet being filtered was a non-head fragment.
+</li>
+<li> We've sent too many ICMP error messages to that destination
+recently (see /proc/sys/net/ipv4/icmp_ratelimit).</li>
+</ul>
+<p></p>
+<p>REJECT also takes a `--reject-with' optional argument which alters the
+reply packet used: see the manual page.</p>
+</dd></dl>
+<p></p>
+
+<h3>Special Built-In Targets</h3>
+
+<p>There are two special built-in targets: <code>RETURN</code> and
+<code>QUEUE</code>.</p>
+
+<p><code>RETURN</code> has the same effect of falling off the end of a
+chain: for a rule in a built-in chain, the policy of the chain is
+executed.  For a rule in a user-defined chain, the traversal continues
+at the previous chain, just after the rule which jumped to this chain.</p>
+
+<p><code>QUEUE</code> is a special target, which queues the packet for
+userspace processing.  For this to be useful, two further components are
+required:</p>
+<p>
+</p><ul>
+<li>a "queue handler", which deals with the actual mechanics of
+passing packets between the kernel and userspace; and</li>
+<li>a userspace application to receive, possibly manipulate, and
+issue verdicts on packets.</li>
+</ul>
+
+The standard queue handler for IPv4 iptables is the ip_queue module,
+which is distributed with the kernel and marked as experimental.<p></p>
+<p>The following is a quick example of how to use iptables to queue packets
+for userspace processing:
+</p><blockquote><code>
+</code><pre># modprobe iptable_filter
+# modprobe ip_queue
+# iptables -A OUTPUT -p icmp -j QUEUE
+</pre>
+</blockquote>
+
+With this rule, locally generated outgoing ICMP packets (as created with,
+say, ping) are passed to the ip_queue module, which then attempts to deliver
+the packets to a userspace application.  If no userspace application is 
+waiting, the packets are dropped.<p></p>
+
+<p>To write a userspace application, use the libipq API.  This is
+distributed with iptables.  Example code may be found in the testsuite
+tools (e.g. redirect.c) in CVS.</p>
+
+<p>The status of ip_queue may be checked via:
+</p><blockquote><code>
+</code><pre>/proc/net/ip_queue
+</pre>
+</blockquote>
+
+The maximum length of the queue (i.e. the number packets delivered
+to userspace with no verdict issued back) may be controlled via:
+<blockquote><code>
+</code><pre>/proc/sys/net/ipv4/ip_queue_maxlen
+</pre>
+</blockquote>
+
+The default value for the maximum queue length is 1024.  Once this limit 
+is reached, new packets will be dropped until the length of the queue falls
+below the limit again.  Nice protocols such as TCP interpret dropped packets
+as congestion, and will hopefully back off when the queue fills up.  However,
+it may take some experimenting to determine an ideal maximum queue length 
+for a given situation if the default value is too small.<p></p>
+
+<h2><a name="chain-ops"></a> <a name="ss7.5">7.5</a> <a href="http://www.netfilter.org/documentation/HOWTO//packet-filtering-HOWTO.html#toc7.5">Operations on an Entire Chain</a>
+</h2>
+
+<p>A very useful feature of <code>iptables</code> is the ability to group
+related rules into chains.  You can call the chains whatever you want,
+but I recommend using lower-case letters to avoid confusion with the
+built-in chains and targets.  Chain names can be up to 31 letters
+long.</p>
+
+<h3>Creating a New Chain</h3>
+
+<p>Let's create a new chain.  Because I am such an imaginative fellow,
+I'll call it <code>test</code>.  We use the `-N' or `--new-chain' options:</p>
+<p>
+</p><blockquote><code>
+</code><pre># iptables -N test
+#
+</pre>
+</blockquote>
+<p></p>
+
+<p>It's that simple.  Now you can put rules in it as detailed above.</p>
+
+<h3>Deleting a Chain</h3>
+
+<p>Deleting a chain is simple as well, using the `-X' or `--delete-chain'
+options.  Why `-X'?  Well, all the good letters were taken.</p>
+<p>
+</p><blockquote><code>
+</code><pre># iptables -X test
+#
+</pre>
+</blockquote>
+<p></p>
+
+<p>There are a couple of restrictions to deleting chains: they must be
+empty (see 
+<a href="https://pub.informatik.haw-hamburg.de/home/pub/staff/schulz_hartmut/Rechnernetze/tools/iptables/packet-filtering-HOWTO-7.html#flushing">Flushing a Chain</a> below) and they
+must not be the target of any rule.  You can't delete any of the three
+built-in chains.</p>
+
+<p>If you don't specify a chain, then <em>all</em> user-defined chains
+will be deleted, if possible.</p>
+
+<h3><a name="flushing"></a> Flushing a Chain</h3>
+
+<p>There is a simple way of emptying all rules out of a chain, using the
+`-F' (or `--flush') commands.</p>
+<p>
+</p><blockquote><code>
+</code><pre># iptables -F FORWARD
+#
+</pre>
+</blockquote>
+<p></p>
+
+<p>If you don't specify a chain, then <em>all</em> chains will be flushed.</p>
+
+<h3>Listing a Chain</h3>
+
+<p>You can list all the rules in a chain by using the `-L' (or `--list')
+command.</p>
+
+<p>The `refcnt' listed for each user-defined chain is the number of rules
+which have that chain as their target.  This must be zero (and the
+chain be empty) before this chain can be deleted.</p>
+
+<p>If the chain name is omitted, all chains are listed, even empty ones.</p>
+
+<p>There are three options which can accompany `-L'.  The `-n' (numeric)
+option is very useful as it prevents <code>iptables</code> from trying to
+lookup the IP addresses, which (if you are using DNS like most people)
+will cause large delays if your DNS is not set up properly, or you
+have filtered out DNS requests.  It also causes TCP and UDP ports to
+be printed out as numbers rather than names.</p>
+
+<p>The `-v' options shows you all the details of the rules, such as the
+the packet and byte counters, the TOS comparisons, and the interfaces.
+Otherwise these values are omitted.</p>
+
+<p>Note that the packet and byte counters are printed out using the
+suffixes `K', `M' or `G' for 1000, 1,000,000 and 1,000,000,000
+respectively.  Using the `-x' (expand numbers) flag as well prints the
+full numbers, no matter how large they are.</p>
+
+<h3>Resetting (Zeroing) Counters</h3>
+
+<p>It is useful to be able to reset the counters.  This can be done with
+the `-Z' (or `--zero') option.</p>
+
+<p>Consider the following:</p>
+<p>
+</p><blockquote><code>
+</code><pre># iptables -L FORWARD
+# iptables -Z FORWARD
+# 
+</pre>
+</blockquote>
+<p></p>
+<p>In the above example, some packets could pass through between the `-L'
+and `-Z' commands.  For this reason, you can use the `-L' and `-Z'
+<em>together</em>, to reset the counters while reading them.</p>
+
+<h3><a name="policy"></a> Setting Policy</h3>
+
+<p>We glossed over what happens when a packet hits the end of a built-in
+chain when we discussed how a packet walks through chains earlier.  In
+this case, the <b>policy</b> of the chain determines the fate of the
+packet.  Only built-in chains (<code>INPUT</code>, <code>OUTPUT</code> and
+<code>FORWARD</code>) have policies, because if a packet falls off the end
+of a user-defined chain, traversal resumes at the previous chain.</p>
+
+<p>The policy can be either <code>ACCEPT</code> or <code>DROP</code>, for
+example:</p>
+<p>
+</p><blockquote><code>
+</code><pre># iptables -P FORWARD DROP
+#
+</pre>
+</blockquote>
+<p></p>
+
+<hr>
+<a href="http://www.netfilter.org/documentation/HOWTO//packet-filtering-HOWTO-8.html">Next</a>
+<a href="http://www.netfilter.org/documentation/HOWTO//packet-filtering-HOWTO-6.html">Previous</a>
+<a href="http://www.netfilter.org/documentation/HOWTO//packet-filtering-HOWTO.html#toc7">Contents</a>
+
+</body></html>

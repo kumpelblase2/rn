@@ -1,0 +1,83 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<!-- saved from url=(0125)https://pub.informatik.haw-hamburg.de/home/pub/staff/schulz_hartmut/Rechnernetze/tools/iptables/packet-filtering-HOWTO-6.html -->
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=windows-1252">
+
+
+ <meta name="GENERATOR" content="LinuxDoc-Tools 0.9.21"><title>Linux 2.4 Packet Filtering HOWTO: How Packets Traverse The Filters</title>
+ 
+ <link href="http://www.netfilter.org/documentation/HOWTO//packet-filtering-HOWTO-7.html" rel="next">
+ <link href="http://www.netfilter.org/documentation/HOWTO//packet-filtering-HOWTO-5.html" rel="previous">
+ <link href="http://www.netfilter.org/documentation/HOWTO//packet-filtering-HOWTO.html#toc6" rel="contents"><style type="text/css"></style></head><body>
+<a href="http://www.netfilter.org/documentation/HOWTO//packet-filtering-HOWTO-7.html">Next</a>
+<a href="http://www.netfilter.org/documentation/HOWTO//packet-filtering-HOWTO-5.html">Previous</a>
+<a href="http://www.netfilter.org/documentation/HOWTO//packet-filtering-HOWTO.html#toc6">Contents</a>
+<hr>
+<h2><a name="s6">6.</a> <a href="http://www.netfilter.org/documentation/HOWTO//packet-filtering-HOWTO.html#toc6">How Packets Traverse The Filters</a></h2>
+
+<p>The kernel starts with three lists of rules in the `filter' table;
+these lists are called <b>firewall chains</b> or just
+<b>chains</b>.  The three chains are called <b>INPUT</b>,
+<b>OUTPUT</b> and <b>FORWARD</b>.</p>
+
+<p>For ASCII-art fans, the chains are arranged like so: <b>(Note: this
+is a very different arrangement from the 2.0 and 2.2 kernels!)</b></p>
+<p>
+</p><pre>                          _____
+Incoming                 /     \         Outgoing
+       --&gt;[Routing ]---&gt;|FORWARD|-------&gt;
+          [Decision]     \_____/        ^
+               |                        |
+               v                       ____
+              ___                     /    \
+             /   \                  |OUTPUT|
+            |INPUT|                  \____/
+             \___/                      ^
+               |                        |
+                ----&gt; Local Process ----
+</pre>
+<p></p>
+
+<p>The three circles represent the three chains mentioned above.  When
+a packet reaches a circle in the diagram, that chain is examined to
+decide the fate of the packet.  If the chain says to DROP the packet,
+it is killed there, but if the chain says to ACCEPT the packet, it
+continues traversing the diagram.</p>
+
+<p>A chain is a checklist of <b>rules</b>.  Each rule says `if the packet
+header looks like this, then here's what to do with the packet'.  If
+the rule doesn't match the packet, then the next rule in the chain is
+consulted.  Finally, if there are no more rules to consult, then the
+kernel looks at the chain <b>policy</b> to decide what to do.  In a
+security-conscious system, this policy usually tells the kernel to
+DROP the packet.</p>
+
+<p>
+</p><ol>
+<li>When a packet comes in (say, through the Ethernet card) the kernel
+first looks at the destination of the packet: this is called
+`routing'.
+</li>
+<li>If it's destined for this box, the packet passes downwards
+in the diagram, to the INPUT chain.  If it passes this, any processes
+waiting for that packet will receive it.
+</li>
+<li>Otherwise, if the kernel does not have forwarding enabled, or it
+doesn't know how to forward the packet, the packet is dropped.  If
+forwarding is enabled, and the packet is destined for another network
+interface (if you have another one), then the packet goes rightwards
+on our diagram to the FORWARD chain.  If it is ACCEPTed, it will be
+sent out.
+</li>
+<li>Finally, a program running on the box can send network packets.
+These packets pass through the OUTPUT chain immediately: if it says
+ACCEPT, then the packet continues out to whatever interface it is
+destined for.</li>
+</ol>
+<p></p>
+
+<hr>
+<a href="http://www.netfilter.org/documentation/HOWTO//packet-filtering-HOWTO-7.html">Next</a>
+<a href="http://www.netfilter.org/documentation/HOWTO//packet-filtering-HOWTO-5.html">Previous</a>
+<a href="http://www.netfilter.org/documentation/HOWTO//packet-filtering-HOWTO.html#toc6">Contents</a>
+
+</body></html>
