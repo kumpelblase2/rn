@@ -1,4 +1,5 @@
-address = "172.16.1.0/24"
+#!/bin/sh
+address="172.16.1.0/24"
 
 sudo iptables -A INPUT -s $address DROP
 sudo iptables -t nat -A OUTPUT -d $address DROP

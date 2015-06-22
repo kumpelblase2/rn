@@ -1,5 +1,6 @@
-address = "172.16.1.0/24"
-port = 51000
+#!/bin/sh
+address="172.16.1.0/24"
+port=51000
 
 sudo iptables -A INPUT -s $address DROP
 sudo iptables -A OUTPUT -d $address DROP
